@@ -35,21 +35,31 @@ router.post('/login', authLimiter, loginValidation, login);
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getCurrentUser);
 
-// Google OAuth routes
-router.get('/google', 
-  passport.authenticate('google', { 
-    scope: ['profile', 'email'] 
-  })
-);
+// Google OAuth routes (only if configured)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  router.get('/google', 
+    passport.authenticate('google', { 
+      scope: ['profile', 'email'] 
+    })
+  );
 
-router.get('/google/callback',
-  passport.authenticate('google', { 
-    failureRedirect: '/api/auth/google/failure',
-    session: false
-  }),
-  googleAuthSuccess
-);
+  router.get('/google/callback',
+    passport.authenticate('google', { 
+      failureRedirect: '/api/auth/google/failure',
+      session: false
+    }),
+    googleAuthSuccess
+  );
 
-router.get('/google/failure', googleAuthFailure);
+  router.get('/google/failure', googleAuthFailure);
+} else {
+  // Fallback routes when Google OAuth is not configured
+  router.get('/google', (req, res) => {
+    res.status(503).json({ 
+      success: false, 
+      message: 'Google OAuth is not configured' 
+    });
+  });
+}
 
 export default router;
