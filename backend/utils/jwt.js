@@ -33,31 +33,33 @@ export const verifyRefreshToken = (token) => {
 };
 
 export const setTokenCookies = (res, accessToken, refreshToken) => {
-  // Access token cookie (15 minutes)
-  res.cookie('accessToken', accessToken, {
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  };
+
+  // Access token cookie (15 minutes)
+  res.cookie('accessToken', accessToken, {
+    ...cookieOptions,
     maxAge: 15 * 60 * 1000 // 15 minutes
   });
 
   // Refresh token cookie (7 days)
   res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    ...cookieOptions,
     maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   });
 };
 
 export const clearTokenCookies = (res) => {
-  res.cookie('accessToken', '', {
+  const cookieOptions = {
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     expires: new Date(0)
-  });
+  };
   
-  res.cookie('refreshToken', '', {
-    httpOnly: true,
-    expires: new Date(0)
-  });
+  res.cookie('accessToken', '', cookieOptions);
+  res.cookie('refreshToken', '', cookieOptions);
 };
