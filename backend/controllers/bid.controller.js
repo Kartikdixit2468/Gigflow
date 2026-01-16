@@ -128,15 +128,19 @@ export const getMyBids = async (req, res) => {
   }
 };
 
-// BONUS: Hire a freelancer (race condition safe)
+// BONUS: Hire a freelancer (race condition safe with MongoDB Transactions)
 export const hireBid = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { bidId } = req.params;
 
-    // Find bid and populate gig
-    const bid = await Bid.findById(bidId).populate('gig');
+    // Find bid and populate gig within transaction
+    const bid = await Bid.findById(bidId).populate('gig').session(session);
 
     if (!bid) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'Bid not found'
@@ -147,13 +151,15 @@ export const hireBid = async (req, res) => {
 
     // Verify gig owner
     if (gig.owner.toString() !== req.user._id.toString()) {
+      await session.abortTransaction();
       return res.status(403).json({
         success: false,
         message: 'Not authorized to hire for this gig'
       });
     }
 
-    // Check if gig is still open (prevents race condition with atomic update)
+    // CRITICAL: Atomic update - only succeeds if gig is still 'open'
+    // This prevents race condition where two admins hire at the same time
     const gigUpdate = await Gig.findOneAndUpdate(
       { 
         _id: gig._id, 
@@ -163,19 +169,24 @@ export const hireBid = async (req, res) => {
         status: 'assigned',
         hiredBid: bidId
       },
-      { new: true }
+      { new: true, session } // Use transaction session
     );
 
-    // If gig wasn't updated, it means it's already assigned
+    // If gig wasn't updated, it means someone else hired first
     if (!gigUpdate) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'This gig has already been assigned'
+        message: 'This gig has already been assigned to another freelancer'
       });
     }
 
     // Update the hired bid status to 'hired'
-    await Bid.findByIdAndUpdate(bidId, { status: 'hired' });
+    await Bid.findByIdAndUpdate(
+      bidId, 
+      { status: 'hired' },
+      { session }
+    );
 
     // Update all other bids for this gig to 'rejected'
     await Bid.updateMany(
@@ -184,10 +195,14 @@ export const hireBid = async (req, res) => {
         _id: { $ne: bidId },
         status: 'pending'
       },
-      { status: 'rejected' }
+      { status: 'rejected' },
+      { session }
     );
 
-    // Fetch updated bid
+    // Commit the transaction - all or nothing
+    await session.commitTransaction();
+
+    // Fetch updated bid (outside transaction)
     const updatedBid = await Bid.findById(bidId)
       .populate('freelancer', 'name email avatar')
       .populate('gig', 'title budget status');
@@ -199,10 +214,14 @@ export const hireBid = async (req, res) => {
     });
 
   } catch (error) {
+    // Rollback on any error
+    await session.abortTransaction();
     res.status(500).json({
       success: false,
       message: error.message
     });
+  } finally {
+    session.endSession();
   }
 };
 
