@@ -5,6 +5,9 @@ import { login } from '../store/authSlice';
 import { Mail, Lock, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const apiUrl = import.meta.env.VITE_API_URL;
+
+
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -32,7 +35,7 @@ const Login = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   return (

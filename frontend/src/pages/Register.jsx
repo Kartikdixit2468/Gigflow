@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../store/authSlice';
 import { Mail, Lock, User as UserIcon, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
+const apiUrl = import.meta.env.VITE_API_URL;
 
 const Register = () => {
   const dispatch = useDispatch();
@@ -40,7 +41,7 @@ const Register = () => {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   return (
